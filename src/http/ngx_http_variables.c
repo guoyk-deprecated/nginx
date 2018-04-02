@@ -2135,10 +2135,11 @@ ngx_http_variable_request_id(ngx_http_request_t *r,
     u_char  *id;
 
 #if (NGX_OPENSSL)
-    u_char   random_bytes[16];
+    u_char   random_bytes[12];
+    ngx_str_t random_str = {.len = 12, .data = (u_char *)random_bytes};
 #endif
 
-    id = ngx_pnalloc(r->pool, 32);
+    id = ngx_pnalloc(r->pool, 16);
     if (id == NULL) {
         return NGX_ERROR;
     }
@@ -2147,22 +2148,21 @@ ngx_http_variable_request_id(ngx_http_request_t *r,
     v->no_cacheable = 0;
     v->not_found = 0;
 
-    v->len = 32;
+    v->len = 16;
     v->data = id;
 
 #if (NGX_OPENSSL)
+    ngx_str_t out = { .len = 16, .data = id };
 
-    if (RAND_bytes(random_bytes, 16) == 1) {
-        ngx_hex_dump(id, random_bytes, 16);
+    if (RAND_bytes(random_bytes, 12) == 1) {
+        ngx_encode_base64url(&out, &random_str);
         return NGX_OK;
     }
 
     ngx_ssl_error(NGX_LOG_ERR, r->connection->log, 0, "RAND_bytes() failed");
-
 #endif
 
-    ngx_sprintf(id, "%08xD%08xD%08xD%08xD",
-                (uint32_t) ngx_random(), (uint32_t) ngx_random(),
+    ngx_sprintf(id, "%08xD%08xD",
                 (uint32_t) ngx_random(), (uint32_t) ngx_random());
 
     return NGX_OK;
